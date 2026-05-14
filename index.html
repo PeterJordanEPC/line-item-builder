@@ -1,0 +1,134 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>EDDY Pump Purchase Line Item Builder</title>
+  <style>
+    body { margin:0; background:#f3f4f6; color:#111827; font-family:Arial, sans-serif; }
+    header { background:#0f172a; color:#fff; padding:18px 28px; }
+    header h1 { margin:0; font-size:22px; }
+    header p { margin:6px 0 0; color:#cbd5e1; }
+    main { max-width:1180px; margin:24px auto; padding:0 16px; display:grid; grid-template-columns: 1fr 1fr; gap:18px; }
+    .card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:18px; box-shadow:0 1px 3px #0001; }
+    .full { grid-column:1 / -1; }
+    label { display:block; margin:12px 0 6px; font-weight:700; font-size:13px; color:#334155; }
+    select, input { width:100%; box-sizing:border-box; padding:10px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px; background:white; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    button { background:#2563eb; color:#fff; border:0; border-radius:8px; padding:12px 14px; font-weight:700; cursor:pointer; margin-top:14px; margin-right:8px; }
+    button.secondary { background:#475569; }
+    .preview { background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px; }
+    code, pre { background:#0f172a; color:#d1fae5; border-radius:10px; padding:12px; display:block; overflow:auto; font-size:12px; }
+    .muted { color:#64748b; font-size:13px; }
+    .pill { display:inline-block; background:#dbeafe; color:#1e3a8a; border-radius:999px; padding:4px 9px; font-size:12px; font-weight:700; margin-left:6px; }
+    .error { color:#991b1b; background:#fee2e2; border:1px solid #fecaca; padding:10px; border-radius:8px; display:none; }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    th,td { border-bottom:1px solid #e5e7eb; padding:8px; text-align:left; vertical-align:top; }
+    th { background:#f8fafc; color:#334155; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>EDDY Pump Purchase Line Item Builder <span class="pill">GitHub Pages MVP</span></h1>
+  <p>Guided sales-rep flow. Generates SKU, description, and HubSpot-ready line item payload. No HubSpot write yet.</p>
+</header>
+<main>
+  <section class="card">
+    <h2>1. Configure Pump</h2>
+    <div class="error" id="error"></div>
+    <label>Deal ID / Test Reference</label>
+    <input id="dealId" placeholder="Optional for MVP, e.g. test deal URL or ID" />
+    <div class="grid">
+      <div><label>Pump Model</label><select id="model"></select></div>
+      <div><label>Product / Application Family</label><select id="family"></select></div>
+      <div><label>Rotor</label><select id="rotor"></select></div>
+      <div><label>Material Code</label><input id="material" value="HC" placeholder="HC, STD, SS, etc." /></div>
+      <div><label>HP</label><input id="hp" value="75HP" /></div>
+      <div><label>Voltage</label><input id="voltage" value="460V" /></div>
+      <div><label>Excavator Option</label><select id="exf"><option>EXC</option><option>EXJ</option><option>EXCJ</option></select></div>
+      <div><label>Quantity</label><input id="quantity" type="number" min="1" value="1" /></div>
+      <div><label>Unit Price Placeholder</label><input id="unitPrice" type="number" min="0" step="0.01" value="0" /></div>
+    </div>
+    <button onclick="configure()">Generate Line Item</button>
+    <button class="secondary" onclick="copyPayload()">Copy HubSpot Payload</button>
+    <p class="muted">Later this becomes a HubSpot private app card with a real “Add Line Item to Deal” button.</p>
+  </section>
+
+  <section class="card">
+    <h2>2. Preview</h2>
+    <div class="preview">
+      <p><strong>SKU</strong></p><code id="sku">—</code>
+      <p><strong>Name</strong></p><p id="lineName">—</p>
+      <p><strong>Description</strong></p><p id="description">—</p>
+      <p><strong>Extended Price</strong></p><p id="extended">—</p>
+    </div>
+  </section>
+
+  <section class="card full">
+    <h2>3. HubSpot-Ready Line Item Payload</h2>
+    <pre id="payload">{}</pre>
+  </section>
+
+  <section class="card full">
+    <h2>Valid Combination Rule Used</h2>
+    <table><tbody id="ruleTable"><tr><td class="muted">Generate a line item to see the matched rule.</td></tr></tbody></table>
+  </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let DATA, RULES;
+function unique(xs){ return [...new Set(xs.filter(Boolean))]; }
+function fill(sel, items, getVal=x=>x, getText=x=>x){ sel.innerHTML = items.map(x => `<option value="${String(getVal(x)).replaceAll('"','&quot;')}">${getText(x)}</option>`).join(''); }
+function familiesFor(model){
+  const seen = new Map();
+  RULES.filter(r=>r.model===model).forEach(r=>seen.set(r.family_key, r.family_name));
+  return [...seen.entries()].map(([family_key,family_name])=>({family_key,family_name})).sort((a,b)=>a.family_name.localeCompare(b.family_name));
+}
+function rotorsFor(model, family_key){ return unique(RULES.filter(r=>r.model===model && r.family_key===family_key).map(r=>r.rotor)).sort((a,b)=>Number(a)-Number(b)); }
+function findRule(){ return RULES.find(r=>r.model===$('model').value && r.family_key===$('family').value && String(r.rotor)===String($('rotor').value)); }
+async function loadInitial(){
+  DATA = await fetch('./pump_config_rules.json').then(r=>r.json());
+  RULES = DATA.rules;
+  fill($('model'), Object.keys(DATA.models).sort());
+  loadFamilies();
+}
+function loadFamilies(){ fill($('family'), familiesFor($('model').value), x=>x.family_key, x=>x.family_name); loadRotors(); }
+function loadRotors(){ fill($('rotor'), rotorsFor($('model').value, $('family').value)); configure(); }
+function buildConfig(){
+  const rule = findRule();
+  if(!rule) throw new Error('Invalid model/family/rotor combination');
+  const material = $('material').value || '[MAT]';
+  const hp = $('hp').value || '[HP]';
+  const voltage = $('voltage').value || '[VOLT]';
+  const exf = $('exf').value || 'EXC';
+  const quantity = Number($('quantity').value || 1);
+  const unitPrice = Number($('unitPrice').value || 0);
+  let sku = rule.configured_part_template.replaceAll('[MAT]', material).replaceAll('[HP]', hp).replaceAll('[VOLT]', voltage).replaceAll('[EXF]', exf).replace(/\s+/g,' ');
+  const name = `${rule.model} ${toTitle(rule.family_name)} - Rotor ${rule.rotor}`;
+  let description = `${rule.model} configured as ${toTitle(rule.family_name)}, rotor ${rule.rotor}, material ${material}, HP ${hp}, voltage ${voltage}.`;
+  if(sku.includes('EX')) description += ` Excavator option: ${exf}.`;
+  return { sku, name, description, quantity, unit_price: unitPrice, extended_price: quantity * unitPrice, rule,
+    hubspot_line_item_payload: { properties: { name, hs_sku: sku, description, quantity: String(quantity), price: String(unitPrice), eddy_model: rule.model, eddy_product_family: rule.family_name, eddy_product_family_key: rule.family_key, eddy_rotor: rule.rotor, eddy_material: material, eddy_hp: hp, eddy_voltage: voltage, eddy_excavator_option: exf, epicor_config_code: sku } }
+  };
+}
+function toTitle(s){ return String(s || '').toLowerCase().replace(/\b\w/g, c=>c.toUpperCase()); }
+function configure(){
+  $('error').style.display='none';
+  try{
+    const j = buildConfig();
+    $('sku').textContent = j.sku;
+    $('lineName').textContent = j.name;
+    $('description').textContent = j.description;
+    $('extended').textContent = '$' + Number(j.extended_price || 0).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2});
+    $('payload').textContent = JSON.stringify(j.hubspot_line_item_payload, null, 2);
+    $('ruleTable').innerHTML = Object.entries(j.rule).map(([k,v]) => `<tr><th>${k}</th><td>${String(v || '')}</td></tr>`).join('');
+  } catch(e){ $('error').textContent=e.message; $('error').style.display='block'; }
+}
+async function copyPayload(){ await navigator.clipboard.writeText($('payload').textContent); alert('Copied payload'); }
+$('model').addEventListener('change', loadFamilies);
+$('family').addEventListener('change', loadRotors);
+['rotor','material','hp','voltage','exf','quantity','unitPrice'].forEach(id => $(id).addEventListener('input', configure));
+loadInitial();
+</script>
+</body>
+</html>
