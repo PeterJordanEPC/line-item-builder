@@ -30,7 +30,7 @@
 <body>
 <header>
   <h1>EDDY Pump Purchase Line Item Builder <span class="pill">GitHub Pages MVP</span></h1>
-  <p>Guided sales-rep flow. Generates SKU, description, and HubSpot-ready line item payload. No HubSpot write yet.</p>
+  <p>Guided sales-rep flow. Generates finished model code, description, and HubSpot-ready line item payload. No HubSpot write yet.</p>
 </header>
 <main>
   <section class="card">
@@ -42,10 +42,58 @@
       <div><label>Pump Model</label><select id="model"></select></div>
       <div><label>Product / Application Family</label><select id="family"></select></div>
       <div><label>Rotor</label><select id="rotor"></select></div>
-      <div><label>Material Code</label><input id="material" value="HC" placeholder="HC, STD, SS, etc." /></div>
-      <div><label>HP</label><input id="hp" value="75HP" /></div>
-      <div><label>Voltage</label><input id="voltage" value="460V" /></div>
-      <div><label>Excavator Option</label><select id="exf"><option>EXC</option><option>EXJ</option><option>EXCJ</option></select></div>
+      <div><label>Material</label><select id="material">
+        <option value="1">High-Chrome (-1)</option>
+        <option value="2">Stainless Steel (-2)</option>
+        <option value="3">Duplex Stainless (-3)</option>
+        <option value="4">Ductile Iron (-4)</option>
+      </select></div>
+      <div><label>HP / Power</label><select id="hp">
+        <option value="HYD">Hydraulic (-HYD)</option>
+        <option value="1">1 HP (-1)</option>
+        <option value="1.5">1.5 HP (-1.5)</option>
+        <option value="3">3 HP (-3)</option>
+        <option value="5">5 HP (-5)</option>
+        <option value="7.5">7.5 HP (-7.5)</option>
+        <option value="10">10 HP (-10)</option>
+        <option value="15">15 HP (-15)</option>
+        <option value="30">30 HP (-30)</option>
+        <option value="50">50 HP (-50)</option>
+        <option value="75">75 HP (-75)</option>
+        <option value="150">150 HP (-150)</option>
+        <option value="250">250 HP (-250)</option>
+        <option value="400">400 HP (-400)</option>
+        <option value="450">450 HP (-450)</option>
+        <option value="700">700 HP (-700)</option>
+      </select></div>
+      <div><label>Voltage</label><select id="voltage">
+        <option value="460">460V (-460)</option>
+        <option value="220">220V (-220)</option>
+      </select></div>
+      <div><label>Deployment</label><select id="exf">
+        <option value="">None</option>
+        <option value="SS">Seal Support (-SS)</option>
+        <option value="SP">Self-Prime (-SP)</option>
+        <option value="SPSF">Self-Prime W/Skid Frame (-SPSF)</option>
+        <option value="SPDS">Self-Prime Diesel W/Skid (-SPDS)</option>
+        <option value="SPDT">Self-Prime Diesel W/Trailer (-SPDT)</option>
+        <option value="SPET">Self-Prime Electric W/Trailer (-SPET)</option>
+        <option value="SF">Skid Frame (-SF)</option>
+        <option value="ENC">Enclosure (-ENC)</option>
+        <option value="EXF">Excavator Frame (-EXF)</option>
+        <option value="EXD">Excavator Diver (-EXD)</option>
+        <option value="EXC">Excavator w/Cutter Head (-EXC)</option>
+        <option value="EXJ">Excavator w/Jetting Ring (-EXJ)</option>
+        <option value="EXCJ">Excavator w/Cutter & Jetting Ring (-EXCJ)</option>
+        <option value="EXJCD">Excavator w/Jetting Ring Cable Deploy (-EXJCD)</option>
+        <option value="CSF">Chopper Frame Skid Frame (-CSF)</option>
+        <option value="SCCD">Submersible Chopper Cable Deploy (-SCCD)</option>
+        <option value="SCD">Submersible Cable Deploy (-SCD)</option>
+        <option value="SSF">Submersible Skid Frame (-SSF)</option>
+        <option value="ESS">Extended Shaft Submersible (-ESS)</option>
+        <option value="DS">Dredge Sled (-DS)</option>
+        <option value="EXCP">Cutter Bucket (-EXCP)</option>
+      </select></div>
       <div><label>Quantity</label><input id="quantity" type="number" min="1" value="1" /></div>
       <div><label>Unit Price Placeholder</label><input id="unitPrice" type="number" min="0" step="0.01" value="0" /></div>
     </div>
@@ -57,7 +105,7 @@
   <section class="card">
     <h2>2. Preview</h2>
     <div class="preview">
-      <p><strong>SKU</strong></p><code id="sku">—</code>
+      <p><strong>Finished Model Code</strong></p><code id="sku">—</code>
       <p><strong>Name</strong></p><p id="lineName">—</p>
       <p><strong>Description</strong></p><p id="description">—</p>
       <p><strong>Extended Price</strong></p><p id="extended">—</p>
@@ -105,15 +153,15 @@ function buildConfig(){
   const material = $('material').value || '[MAT]';
   const hp = $('hp').value || '[HP]';
   const voltage = $('voltage').value || '[VOLT]';
-  const exf = $('exf').value || 'EXC';
+  const exf = $('exf').value || '';
   const quantity = Number($('quantity').value || 1);
   const unitPrice = Number($('unitPrice').value || 0);
   let sku = rule.configured_part_template.replaceAll('[MAT]', material).replaceAll('[HP]', hp).replaceAll('[VOLT]', voltage).replaceAll('[EXF]', exf).replace(/\s+/g,' ');
   const name = `${rule.model} ${toTitle(rule.family_name)} - Rotor ${rule.rotor}`;
   let description = `${rule.model} configured as ${toTitle(rule.family_name)}, rotor ${rule.rotor}, material ${material}, HP ${hp}, voltage ${voltage}.`;
-  if(sku.includes('EX')) description += ` Excavator option: ${exf}.`;
+  if(exf) description += ` Deployment: ${exf}.`;
   return { sku, name, description, quantity, unit_price: unitPrice, extended_price: quantity * unitPrice, rule,
-    hubspot_line_item_payload: { properties: { name, hs_sku: sku, description, quantity: String(quantity), price: String(unitPrice), eddy_model: rule.model, eddy_product_family: rule.family_name, eddy_product_family_key: rule.family_key, eddy_rotor: rule.rotor, eddy_material: material, eddy_hp: hp, eddy_voltage: voltage, eddy_excavator_option: exf, epicor_config_code: sku } }
+    hubspot_line_item_payload: { properties: { name, hs_sku: sku, description, quantity: String(quantity), price: String(unitPrice), eddy_model: rule.model, eddy_product_family: rule.family_name, eddy_product_family_key: rule.family_key, eddy_rotor: rule.rotor, eddy_material: material, eddy_hp: hp, eddy_voltage: voltage, eddy_deployment: exf, epicor_config_code: sku } }
   };
 }
 function toTitle(s){ return String(s || '').toLowerCase().replace(/\b\w/g, c=>c.toUpperCase()); }
