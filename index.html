@@ -152,13 +152,20 @@ function buildConfig(){
   if(!rule) throw new Error('Invalid model/family/rotor combination');
   const material = $('material').value || '[MAT]';
   const hp = $('hp').value || '[HP]';
-  const voltage = $('voltage').value || '[VOLT]';
+  const isHydraulic = String(hp).toUpperCase() === 'HYD';
+  const voltage = isHydraulic ? '' : ($('voltage').value || '[VOLT]');
   const exf = $('exf').value || '';
   const quantity = Number($('quantity').value || 1);
   const unitPrice = Number($('unitPrice').value || 0);
-  let sku = rule.configured_part_template.replaceAll('[MAT]', material).replaceAll('[HP]', hp).replaceAll('[VOLT]', voltage).replaceAll('[EXF]', exf).replace(/\s+/g,' ');
+  let sku = rule.configured_part_template.replaceAll('[MAT]', material).replaceAll('[HP]', hp).replaceAll('[EXF]', exf);
+  if (isHydraulic) {
+    sku = sku.replace('-[VOLT]', '').replace('[VOLT]', '');
+  } else {
+    sku = sku.replaceAll('[VOLT]', voltage);
+  }
+  sku = sku.replace(/\s+/g,' ').replace(/-+$/,'');
   const name = `${rule.model} ${toTitle(rule.family_name)} - Rotor ${rule.rotor}`;
-  let description = `${rule.model} configured as ${toTitle(rule.family_name)}, rotor ${rule.rotor}, material ${material}, HP ${hp}, voltage ${voltage}.`;
+  let description = `${rule.model} configured as ${toTitle(rule.family_name)}, rotor ${rule.rotor}, material ${material}, ${isHydraulic ? 'hydraulic power' : `HP ${hp}, voltage ${voltage}`}.`;
   if(exf) description += ` Deployment: ${exf}.`;
   return { sku, name, description, quantity, unit_price: unitPrice, extended_price: quantity * unitPrice, rule,
     hubspot_line_item_payload: { properties: { name, hs_sku: sku, description, quantity: String(quantity), price: String(unitPrice), eddy_model: rule.model, eddy_product_family: rule.family_name, eddy_product_family_key: rule.family_key, eddy_rotor: rule.rotor, eddy_material: material, eddy_hp: hp, eddy_voltage: voltage, eddy_deployment: exf, epicor_config_code: sku } }
@@ -180,7 +187,8 @@ function configure(){
 async function copyPayload(){ await navigator.clipboard.writeText($('payload').textContent); alert('Copied payload'); }
 $('model').addEventListener('change', loadFamilies);
 $('family').addEventListener('change', loadRotors);
-['rotor','material','hp','voltage','exf','quantity','unitPrice'].forEach(id => $(id).addEventListener('input', configure));
+['rotor','material','voltage','exf','quantity','unitPrice'].forEach(id => $(id).addEventListener('input', configure));
+$('hp').addEventListener('input', () => { const isHydraulic = $('hp').value === 'HYD'; $('voltage').disabled = isHydraulic; configure(); });
 loadInitial();
 </script>
 </body>
