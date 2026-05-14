@@ -86,10 +86,15 @@ function familiesFor(model){
 }
 function rotorsFor(model, family_key){ return unique(RULES.filter(r=>r.model===model && r.family_key===family_key).map(r=>r.rotor)).sort((a,b)=>Number(a)-Number(b)); }
 function findRule(){ return RULES.find(r=>r.model===$('model').value && r.family_key===$('family').value && String(r.rotor)===String($('rotor').value)); }
+function modelSortOrder(model){
+  const order = ['HD1K','HD2K','HH2K','HD3K','HD4K','HD6K','HD8K','HD10K','HD12K'];
+  const idx = order.indexOf(String(model).toUpperCase());
+  return idx === -1 ? 999 : idx;
+}
 async function loadInitial(){
   DATA = await fetch('./pump_config_rules.json').then(r=>r.json());
   RULES = DATA.rules;
-  fill($('model'), Object.keys(DATA.models).sort());
+  fill($('model'), Object.keys(DATA.models).sort((a,b) => modelSortOrder(a) - modelSortOrder(b) || a.localeCompare(b)));
   loadFamilies();
 }
 function loadFamilies(){ fill($('family'), familiesFor($('model').value), x=>x.family_key, x=>x.family_name); loadRotors(); }
