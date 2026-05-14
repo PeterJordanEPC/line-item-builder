@@ -127,6 +127,35 @@ const $ = id => document.getElementById(id);
 let DATA, RULES;
 function unique(xs){ return [...new Set(xs.filter(Boolean))]; }
 function fill(sel, items, getVal=x=>x, getText=x=>x){ sel.innerHTML = items.map(x => `<option value="${String(getVal(x)).replaceAll('"','&quot;')}">${getText(x)}</option>`).join(''); }
+const ALL_DEPLOYMENTS = [
+  {value:'', label:'None'},
+  {value:'SS', label:'Seal Support (-SS)'},
+  {value:'SP', label:'Self-Prime (-SP)'},
+  {value:'SPSF', label:'Self-Prime W/Skid Frame (-SPSF)'},
+  {value:'SPDS', label:'Self-Prime Diesel W/Skid (-SPDS)'},
+  {value:'SPDT', label:'Self-Prime Diesel W/Trailer (-SPDT)'},
+  {value:'SPET', label:'Self-Prime Electric W/Trailer (-SPET)'},
+  {value:'SF', label:'Skid Frame (-SF)'},
+  {value:'ENC', label:'Enclosure (-ENC)'},
+  {value:'EXF', label:'Excavator Frame (-EXF)'},
+  {value:'EXD', label:'Excavator Diver (-EXD)'},
+  {value:'EXC', label:'Excavator w/Cutter Head (-EXC)'},
+  {value:'EXJ', label:'Excavator w/Jetting Ring (-EXJ)'},
+  {value:'EXCJ', label:'Excavator w/Cutter & Jetting Ring (-EXCJ)'},
+  {value:'EXJCD', label:'Excavator w/Jetting Ring Cable Deploy (-EXJCD)'},
+  {value:'CSF', label:'Chopper Frame Skid Frame (-CSF)'},
+  {value:'SCCD', label:'Submersible Chopper Cable Deploy (-SCCD)'},
+  {value:'SCD', label:'Submersible Cable Deploy (-SCD)'},
+  {value:'SSF', label:'Submersible Skid Frame (-SSF)'},
+  {value:'ESS', label:'Extended Shaft Submersible (-ESS)'},
+  {value:'DS', label:'Dredge Sled (-DS)'},
+  {value:'EXCP', label:'Cutter Bucket (-EXCP)'}
+];
+const EXCAVATOR_DEPLOYMENTS = [
+  {value:'EXC', label:'Excavator w/Cutter Head (-EXC)'},
+  {value:'EXJ', label:'Excavator w/Jetting Ring (-EXJ)'},
+  {value:'EXCJ', label:'Excavator w/Cutter & Jetting Ring (-EXCJ)'}
+];
 function familiesFor(model){
   const seen = new Map();
   RULES.filter(r=>r.model===model).forEach(r=>seen.set(r.family_key, r.family_name));
@@ -145,8 +174,20 @@ async function loadInitial(){
   fill($('model'), Object.keys(DATA.models).sort((a,b) => modelSortOrder(a) - modelSortOrder(b) || a.localeCompare(b)));
   loadFamilies();
 }
+function selectedFamily(){ return familiesFor($('model').value).find(f => f.family_key === $('family').value); }
+function isLimitedExcavatorFamily(){
+  const fam = selectedFamily();
+  const name = String(fam?.family_name || '').toUpperCase();
+  return name.includes('EXCAVATOR ATTACH') && (name.includes('SELF-PRIME') || name.includes('FLEX COUPLED'));
+}
+function loadDeployments(){
+  const current = $('exf').value;
+  const opts = isLimitedExcavatorFamily() ? EXCAVATOR_DEPLOYMENTS : ALL_DEPLOYMENTS;
+  fill($('exf'), opts, x=>x.value, x=>x.label);
+  if ([...$('exf').options].some(o => o.value === current)) $('exf').value = current;
+}
 function loadFamilies(){ fill($('family'), familiesFor($('model').value), x=>x.family_key, x=>x.family_name); loadRotors(); }
-function loadRotors(){ fill($('rotor'), rotorsFor($('model').value, $('family').value)); configure(); }
+function loadRotors(){ fill($('rotor'), rotorsFor($('model').value, $('family').value)); loadDeployments(); configure(); }
 function buildConfig(){
   const rule = findRule();
   if(!rule) throw new Error('Invalid model/family/rotor combination');
@@ -163,7 +204,7 @@ function buildConfig(){
   } else {
     sku = sku.replaceAll('[VOLT]', voltage);
   }
-  sku = sku.replace(/\s+/g,' ').replace(/-+$/,'');
+  sku = sku.replace(/\s*\[EXC, EXJ, EXCJ\]/g, '').replace(/\s+/g,' ').replace(/-+$/,'');
   const name = `${rule.model} ${toTitle(rule.family_name)} - Rotor ${rule.rotor}`;
   let description = `${rule.model} configured as ${toTitle(rule.family_name)}, rotor ${rule.rotor}, material ${material}, ${isHydraulic ? 'hydraulic power' : `HP ${hp}, voltage ${voltage}`}.`;
   if(exf) description += ` Deployment: ${exf}.`;
